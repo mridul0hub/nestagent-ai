@@ -1064,35 +1064,236 @@
 </section>
 </div>
 
-<!-- VIDEO -->
+<!-- TRY AGENT -->
 <section id="video">
-  <div class="reveal">
-    <div class="section-label">See It In Action</div>
-    <h2 class="section-title">Watch LeadWake handle<br>a real lead. Live.</h2>
-    <p class="section-sub" style="margin:0 auto;">See how your AI agent responds, qualifies, and books a site visit — entirely on its own.</p>
+  <div class="reveal" style="text-align:center;">
+    <div class="section-label">Live Demo</div>
+    <h2 class="section-title">Try LeadWake Agent<br>Right Now. For Free.</h2>
+    <p class="section-sub" style="margin:0 auto;">Enter your details — agent aapke WhatsApp pe 60 seconds mein message karega. Koi app download nahi, koi signup nahi.</p>
   </div>
-  <div class="video-container reveal" onclick="alert('Demo video coming soon! Join the waitlist to get early access.')">
-    <div class="video-bg"></div>
-    <svg class="video-lines" viewBox="0 0 1200 600" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#00e5c3" stop-opacity="0"/>
-          <stop offset="50%" stop-color="#00e5c3" stop-opacity="0.4"/>
-          <stop offset="100%" stop-color="#00e5c3" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d="M0,300 Q300,200 600,300 Q900,400 1200,300" stroke="url(#lineGrad)" stroke-width="1" fill="none"/>
-      <path d="M0,320 Q400,220 700,350 Q900,420 1200,280" stroke="rgba(0,229,195,0.15)" stroke-width="1" fill="none"/>
-      <circle cx="240" cy="240" r="3" fill="#00e5c3" opacity="0.5"/>
-      <circle cx="600" cy="300" r="4" fill="#00e5c3" opacity="0.7"/>
-      <circle cx="960" cy="320" r="3" fill="#a0ffe8" opacity="0.5"/>
-    </svg>
-    <div class="video-pulse"></div>
-    <div class="play-btn">
-      <div class="play-triangle"></div>
+
+  <style>
+    .try-agent-card {
+      max-width: 600px;
+      margin: 60px auto 0;
+      background: linear-gradient(160deg, rgba(0,229,195,0.08) 0%, rgba(0,229,195,0.02) 100%);
+      border: 1px solid rgba(0,229,195,0.25);
+      border-radius: 28px;
+      padding: 52px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .try-agent-card::before {
+      content: '';
+      position: absolute; top: 0; left: 15%; right: 15%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--teal), transparent);
+    }
+    .try-agent-live {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,229,195,0.1);
+      border: 1px solid rgba(0,229,195,0.2);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 12px;
+      color: var(--teal);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+    .try-agent-live .ldot {
+      width: 6px; height: 6px;
+      background: var(--teal);
+      border-radius: 50%;
+      animation: pulse-dot 1.5s ease infinite;
+    }
+    .try-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .try-row { display: flex; gap: 12px; }
+    .try-input {
+      width: 100%;
+      background: rgba(0,229,195,0.05);
+      border: 1px solid rgba(0,229,195,0.2);
+      color: var(--text);
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: all 0.3s;
+    }
+    .try-input::placeholder { color: var(--text-muted); }
+    .try-input:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 16px rgba(0,229,195,0.15);
+    }
+    .try-input.error { border-color: rgba(255,100,100,0.5); }
+    .try-btn {
+      width: 100%;
+      background: var(--teal);
+      color: var(--bg);
+      border: none;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: 'DM Sans', sans-serif;
+      margin-top: 4px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .try-btn:hover {
+      box-shadow: 0 0 40px rgba(0,229,195,0.5);
+      transform: translateY(-2px);
+    }
+    .try-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .try-note {
+      font-size: 12px; color: var(--text-muted);
+      text-align: center; margin-top: 12px; line-height: 1.5;
+    }
+    .try-success {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+      animation: fade-up 0.5s ease;
+    }
+    .try-success .tick { font-size: 48px; margin-bottom: 16px; }
+    .try-success h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px; font-weight: 700;
+      color: var(--teal); margin-bottom: 10px;
+    }
+    .try-success p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+    .try-steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: 40px;
+      position: relative;
+    }
+    .try-steps::before {
+      content: '';
+      position: absolute;
+      top: 20px; left: 20px; right: 20px;
+      height: 1px;
+      background: rgba(0,229,195,0.15);
+    }
+    .try-step {
+      flex: 1; text-align: center;
+      position: relative; z-index: 1;
+    }
+    .try-step-dot {
+      width: 40px; height: 40px;
+      background: var(--bg2);
+      border: 1px solid rgba(0,229,195,0.3);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 10px;
+      font-size: 16px;
+    }
+    .try-step-label {
+      font-size: 11px; color: var(--text-muted);
+      letter-spacing: 0.05em;
+      line-height: 1.4;
+    }
+    @media (max-width: 600px) {
+      .try-agent-card { padding: 36px 24px; }
+      .try-row { flex-direction: column; gap: 14px; }
+    }
+  </style>
+
+  <div class="try-agent-card reveal">
+    <div style="text-align:center;">
+      <div class="try-agent-live"><div class="ldot"></div> Agent Live</div>
     </div>
-    <div class="video-label">Demo Video — 2 min</div>
+
+    <!-- Steps -->
+    <div class="try-steps">
+      <div class="try-step">
+        <div class="try-step-dot">📝</div>
+        <div class="try-step-label">Details<br>bharo</div>
+      </div>
+      <div class="try-step">
+        <div class="try-step-dot">🤖</div>
+        <div class="try-step-label">Agent<br>activate</div>
+      </div>
+      <div class="try-step">
+        <div class="try-step-dot">📱</div>
+        <div class="try-step-label">WhatsApp<br>message</div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="try-form" id="tryForm">
+      <div class="try-row">
+        <input class="try-input" id="tryName" type="text" placeholder="Aapka naam *">
+        <input class="try-input" id="tryPhone" type="tel" placeholder="WhatsApp number *">
+      </div>
+      <input class="try-input" id="tryProject" type="text" placeholder="Project naam (optional)">
+      <button class="try-btn" id="tryBtn" onclick="tryAgent()">
+        <span id="tryBtnText">WhatsApp Pe Agent Bhejo →</span>
+        <div class="spinner" id="trySpinner" style="display:none;"></div>
+      </button>
+      <p class="try-note">🔒 Sirf demo ke liye — koi charge nahi. Aapka number safe hai.</p>
+    </div>
+
+    <!-- Success -->
+    <div class="try-success" id="trySuccess">
+      <div class="tick">🎉</div>
+      <h3>Agent Sent!</h3>
+      <p>Aapke WhatsApp pe abhi message aa raha hoga.<br>Reply karke agent se baat karo — bilkul real lagega!</p>
+    </div>
   </div>
+
+  <script>
+    const BACKEND_URL = 'https://nestagent-backend-production.up.railway.app';
+
+    async function tryAgent() {
+      const name = document.getElementById('tryName').value.trim();
+      const phone = document.getElementById('tryPhone').value.trim();
+      const project = document.getElementById('tryProject').value.trim();
+
+      // Validation
+      let hasError = false;
+      [['tryName', name], ['tryPhone', phone]].forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if(!val) { el.classList.add('error'); hasError = true; }
+        else el.classList.remove('error');
+      });
+      if(phone && phone.replace(/\D/g,'').length < 10) {
+        document.getElementById('tryPhone').classList.add('error');
+        hasError = true;
+      }
+      if(hasError) return;
+
+      // Loading
+      const btn = document.getElementById('tryBtn');
+      btn.disabled = true;
+      document.getElementById('tryBtnText').style.display = 'none';
+      document.getElementById('trySpinner').style.display = 'block';
+
+      try {
+        await fetch(`${BACKEND_URL}/new-lead`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            phone,
+            source: 'Website Demo',
+            project: project || 'NestAgent Demo'
+          })
+        });
+      } catch(err) {
+        console.log('Request sent');
+      }
+
+      // Show success
+      document.getElementById('tryForm').style.display = 'none';
+      document.getElementById('trySuccess').style.display = 'block';
+    }
+  </script>
 </section>
 
 <!-- WAITLIST -->

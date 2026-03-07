@@ -2,52 +2,115 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const twilio = require('twilio');
+const { createClient } = require('@supabase/supabase-js');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Twilio setup
-const client = twilio(
+// ===== SETUP =====
+const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
 const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 
-// ===== STEP 1: Lead aaya (99acres/MagicBricks/FB se) =====
-// Yeh endpoint call hoga jab naya lead aayega
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+// ===== GEMINI SMART REPLY =====
+async function getSmartReply(userMessage, leadName, projectName, conversationHistory) {
+  try {
+    const prompt = `
+    Tu ek real estate sales executive hai jiska naam "VASU" hai.
+    Tu WhatsApp pe buyers se personally baat kar raha hai.
+
+    Lead ka naam: ${leadName}
+    Project: ${projectName || 'Green Valley Apartments'}
+
+    Pichli conversation:
+    ${conversationHistory}
+
+    Buyer ka naya message: "${userMessage}"
+
+    Strict rules — inn rules ko kabhi mat todna:
+    - Khud ko AI ya bot mat bolna — tu ek insaan hai
+    - Naam "Rahul" use karna agar zaroorat ho
+    - Hinglish mein baat kar — jaise real sales executive karta hai
+    - Maximum 3-4 lines ka reply — chota aur natural
+    - Brackets ya placeholders bilkul mat likhna jaise [mention this]
+    - Emojis zyada mat use karna — sirf 1 maximum per message
+    - Seedha helpful bano — bakwaas nahi
+    - Agar project details nahi pata toh bol "main abhi check karke batata hoon"
+    - Buyer ko feel hona chahiye ki ek real insaan se baat ho rahi hai
+
+    Sirf reply likh — koi heading, explanation nahi.
+    `;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (err) {
+    console.error('Gemini error:', err.message);
+    return `Shukriya! 😊 Main abhi thoda busy hoon, kya aap thodi der baad try kar sakte hain? Ya seedha call karein! 📞`;
+  }
+}
+
+// ===== NEW LEAD AAYA =====
 app.post('/new-lead', async (req, res) => {
   try {
     const { name, phone, source, project } = req.body;
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const toNumber = `whatsapp:+91${cleanPhone}`;
 
-    // Phone number format karo
-    const toNumber = `whatsapp:+91${phone.replace(/\D/g, '').slice(-10)}`;
+    // Supabase mein lead save karo
+    const { error: dbError } = await supabase
+      .from('leads')
+      .upsert({
+        name,
+        phone: cleanPhone,
+        source: source || 'Website',
+        project: project || 'NestAgent Project',
+        status: 'contacted'
+      }, { onConflict: 'phone' });
 
-    // Personalized message banao
-    const message = `Namaste ${name} ji! 🙏
+    if (dbError) console.error('DB Error:', dbError.message);
 
-Aapne *${project || 'hamare project'}* mein interest dikhaya — shukriya!
+    // Pehla WhatsApp message
+    const firstMessage = `Namaste ${name} ji! 🙏
 
-Main *NestAgent AI* hoon, aapki madad karne ke liye hamesha tayyar hoon. 😊
+Main *NestAgent AI* hoon — aapke liye hamesha available! 😊
 
-Kya aap chahenge ki hum aapko:
-1️⃣ Project ki poori details bhejein
-2️⃣ Site visit schedule karein
-3️⃣ Current offers batayein
+Aapne *${project || 'hamare project'}* mein interest dikhaya — bahut shukriya!
 
-Bas reply karein: *1*, *2*, ya *3* 👇
+Aap mujhse seedha pooch sakte hain:
+💬 Project ki details
+📅 Site visit booking  
+💰 Price aur offers
+❓ Koi bhi sawaal
 
-_(Source: ${source || 'Website'})_`;
+Batao, main kaise help kar sakta hoon? 👇`;
 
-    // WhatsApp message bhejo
-    await client.messages.create({
+    await twilioClient.messages.create({
       from: FROM_NUMBER,
       to: toNumber,
-      body: message
+      body: firstMessage
     });
 
-    console.log(`✅ Lead contacted: ${name} (${phone})`);
+    // Message save karo
+    await supabase.from('messages').insert({
+      lead_phone: cleanPhone,
+      direction: 'outgoing',
+      message_text: firstMessage
+    });
+
+    console.log(`✅ Lead contacted: ${name} (${cleanPhone})`);
     res.json({ success: true, message: `WhatsApp sent to ${name}` });
 
   } catch (err) {
@@ -56,90 +119,129 @@ _(Source: ${source || 'Website'})_`;
   }
 });
 
-// ===== STEP 2: Lead ne reply kiya =====
-// Twilio is webhook ko call karega jab lead reply kare
-app.post('/whatsapp-reply', (req, res) => {
-  const body = req.body || {};
-  const reply = (body.Body || '').trim();
-  const From = body.From || '';
-  const name = body.ProfileName || 'Aap';
+// ===== BUYER NE REPLY KIYA =====
+app.post('/whatsapp-reply', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const incomingMessage = (body.Body || '').trim();
+    const fromNumber = (body.From || '').replace('whatsapp:+91', '').replace('whatsapp:+', '');
+    const cleanPhone = fromNumber.slice(-10);
 
-  console.log(`📩 Reply from ${From}: ${reply}`);
+    console.log(`📩 Reply from ${cleanPhone}: ${incomingMessage}`);
 
-  let responseMessage = '';
+    // Lead dhundho database mein
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('phone', cleanPhone)
+      .single();
 
-  if (reply === '1') {
-    responseMessage = `Bilkul ${name} ji! 🏠
+    const leadName = lead?.name || 'Aap';
+    const projectName = lead?.project || 'hamare project';
 
-Yeh hain hamare project ki khaas baatein:
-• 2BHK & 3BHK flats available
-• Premium location
-• Ready to move & under construction options
-• EMI starting from ₹15,000/month
+    // Incoming message save karo
+    await supabase.from('messages').insert({
+      lead_phone: cleanPhone,
+      direction: 'incoming',
+      message_text: incomingMessage
+    });
 
-Kya aap site visit ke liye available hain? 📅`;
+    // Pichli conversation history lo
+    const { data: history } = await supabase
+      .from('messages')
+      .select('direction, message_text, created_at')
+      .eq('lead_phone', cleanPhone)
+      .order('created_at', { ascending: true })
+      .limit(10);
 
-  } else if (reply === '2') {
-    responseMessage = `Zaroor ${name} ji! 📅
+    const conversationHistory = (history || [])
+      .map(m => `${m.direction === 'incoming' ? 'Buyer' : 'Agent'}: ${m.message_text}`)
+      .join('\n');
 
-Site visit ke liye yeh time slots available hain:
-• Kal subah 10 AM - 12 PM
-• Kal dopahar 2 PM - 5 PM  
-• Parso subah 11 AM
+    // Gemini se smart reply lo
+    const smartReply = await getSmartReply(
+      incomingMessage,
+      leadName,
+      projectName,
+      conversationHistory
+    );
 
-Aapko kaunsa time suit karega?
-Reply mein time batayein ya call karein: *+91-XXXXXXXXXX*`;
+    // Lead status update karo
+    await supabase
+      .from('leads')
+      .update({ status: 'in_conversation' })
+      .eq('phone', cleanPhone);
 
-  } else if (reply === '3') {
-    responseMessage = `🎉 Special Offers — Sirf Limited Time!
+    // Reply save karo
+    await supabase.from('messages').insert({
+      lead_phone: cleanPhone,
+      direction: 'outgoing',
+      message_text: smartReply
+    });
 
-✅ Pre-launch price mein booking
-✅ 0% brokerage
-✅ Free modular kitchen (first 10 bookings)
-✅ Flexible payment plan
-
-*Abhi book karo — offer 7 din mein khatam!*
-
-Site visit ke liye reply karein: *2* 👆`;
-
-  } else {
-    responseMessage = `Shukriya ${name} ji! 😊
-
-Main samjha nahi — kripya yeh reply karein:
-1️⃣ *1* — Project details chahiye
-2️⃣ *2* — Site visit book karein
-3️⃣ *3* — Special offers dekhein
-
-Ya seedha call karein hamare team ko! 📞`;
-  }
-
-  // Twilio TwiML format mein reply
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // TwiML format mein reply bhejo
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>${responseMessage}</Message>
+  <Message>${smartReply}</Message>
 </Response>`;
 
-  res.type('text/xml');
-  res.send(twiml);
+    res.type('text/xml');
+    res.send(twiml);
+
+  } catch (err) {
+    console.error('❌ Reply error:', err.message);
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>Shukriya! Hum jald hi aapse contact karenge. 🙏</Message>
+</Response>`;
+    res.type('text/xml');
+    res.send(twiml);
+  }
 });
 
-// ===== Health check =====
+// ===== LEADS DASHBOARD API =====
+app.get('/leads', async (req, res) => {
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, leads: data });
+});
+
+// ===== CONVERSATION HISTORY =====
+app.get('/conversation/:phone', async (req, res) => {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('lead_phone', req.params.phone)
+    .order('created_at', { ascending: true });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, messages: data });
+});
+
+// ===== HEALTH CHECK =====
 app.get('/', (req, res) => {
   res.json({
     status: '🟢 NestAgent Backend Running',
-    version: '1.0.0',
-    agent: 'LeadWake Agent',
+    version: '2.0.0',
+    agent: 'LeadWake Agent — Powered by Gemini AI',
+    database: '✅ Supabase Connected',
     time: new Date().toLocaleString('en-IN')
   });
 });
 
-// ===== Server start =====
+// ===== SERVER START =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`
-🚀 NestAgent Backend Started!
+🚀 NestAgent Backend v2.0 Started!
 🌐 Port: ${PORT}
 🤖 LeadWake Agent: Ready
+🧠 Gemini AI: Connected
+🗄️  Supabase: Connected
 📱 WhatsApp: Connected
   `);
 });
