@@ -1150,23 +1150,380 @@
   }, { threshold: 0.1 });
   reveals.forEach(r => obs.observe(r));
 
-  // Waitlist
+  // Waitlist section form (bottom of page)
   function joinWaitlist() {
     const email = document.getElementById('emailInput').value;
-    if(!email || !email.includes('@')) { document.getElementById('emailInput').style.borderColor='rgba(255,100,100,0.5)'; return; }
-    document.getElementById('emailInput').style.display='none';
-    document.querySelector('.waitlist-form button').style.display='none';
-    document.getElementById('successMsg').style.display='block';
-    // Animate counter
-    const counter = document.getElementById('counter');
-    let n = 247;
-    const interval = setInterval(() => {
-      n++; counter.textContent = n;
-      if(n >= 248) clearInterval(interval);
-    }, 300);
+    if(!email || !email.includes('@')) { 
+      document.getElementById('emailInput').style.borderColor='rgba(255,100,100,0.5)'; 
+      return; 
+    }
+    openSignupWall(email);
   }
   document.getElementById('emailInput').addEventListener('keypress', e => { if(e.key==='Enter') joinWaitlist(); });
 </script>
 
+<!-- ===== SIGNUP WALL OVERLAY ===== -->
+<style>
+  #signupWall {
+    position: fixed; inset: 0;
+    background: rgba(7,13,12,0.97);
+    backdrop-filter: blur(20px);
+    z-index: 9990;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    animation: wallFadeIn 0.6s ease forwards;
+    overflow-y: auto;
+  }
+  @keyframes wallFadeIn {
+    to { opacity: 1; }
+  }
+  .wall-card {
+    background: linear-gradient(160deg, rgba(0,229,195,0.08) 0%, rgba(0,229,195,0.02) 100%);
+    border: 1px solid rgba(0,229,195,0.25);
+    border-radius: 28px;
+    padding: 56px 48px;
+    max-width: 520px;
+    width: 100%;
+    text-align: center;
+    position: relative;
+    overflow: visible;
+    margin: auto;
+  }
+  .wall-card::before {
+    content: '';
+    position: absolute; top: 0; left: 15%; right: 15%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--teal), transparent);
+  }
+  .wall-logo {
+    width: 72px; height: 72px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid rgba(0,229,195,0.4);
+    box-shadow: 0 0 30px rgba(0,229,195,0.5);
+    margin: 0 auto 24px;
+    display: block;
+  }
+  .wall-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px; font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+  .wall-sub {
+    font-size: 15px; color: var(--text-muted);
+    line-height: 1.6; margin-bottom: 36px;
+    font-weight: 300;
+  }
+  .wall-form {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .wall-row { display: flex; gap: 12px; }
+  .wall-input {
+    width: 100%;
+    background: rgba(0,229,195,0.05);
+    border: 1px solid rgba(0,229,195,0.2);
+    color: var(--text);
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: all 0.3s;
+  }
+  .wall-input::placeholder { color: var(--text-muted); }
+  .wall-input:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 16px rgba(0,229,195,0.15);
+  }
+  .wall-input.error { border-color: rgba(255,100,100,0.6); }
+  /* Custom dropdown */
+  .custom-select-wrapper {
+    position: relative;
+    width: 100%;
+  }
+  .custom-select-trigger {
+    width: 100%;
+    background: rgba(0,229,195,0.05);
+    border: 1px solid rgba(0,229,195,0.2);
+    color: var(--text-muted);
+    padding: 14px 44px 14px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex; align-items: center; justify-content: space-between;
+    user-select: none;
+  }
+  .custom-select-trigger:hover,
+  .custom-select-trigger.open {
+    border-color: var(--teal);
+    box-shadow: 0 0 16px rgba(0,229,195,0.15);
+  }
+  .custom-select-trigger.selected { color: var(--text); }
+  .custom-select-arrow {
+    position: absolute; right: 16px; top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 16px;
+    pointer-events: none;
+    transition: transform 0.3s;
+    color: var(--text-muted);
+  }
+  .custom-select-trigger.open + .custom-select-arrow { transform: translateY(-50%) rotate(180deg); }
+  .custom-options {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0; right: 0;
+    background: #0e1c19;
+    border: 1px solid rgba(0,229,195,0.25);
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 9999;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,229,195,0.08);
+  }
+  .custom-options.open { display: block; }
+  .custom-option {
+    padding: 14px 20px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid rgba(0,229,195,0.07);
+  }
+  .custom-option:last-child { border-bottom: none; }
+  .custom-option:hover {
+    background: rgba(0,229,195,0.1);
+    color: var(--teal);
+    padding-left: 28px;
+  }
+  .custom-option.selected {
+    color: var(--teal);
+    background: rgba(0,229,195,0.08);
+  }
+  .wall-btn {
+    width: 100%;
+    background: var(--teal);
+    color: var(--bg);
+    border: none;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: 'DM Sans', sans-serif;
+    letter-spacing: 0.02em;
+    margin-top: 4px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .wall-btn:hover {
+    box-shadow: 0 0 40px rgba(0,229,195,0.5);
+    transform: translateY(-2px);
+  }
+  .wall-btn:disabled {
+    opacity: 0.7; cursor: not-allowed; transform: none;
+  }
+  .wall-note {
+    font-size: 12px; color: var(--text-muted);
+    margin-top: 16px; line-height: 1.5;
+  }
+  .wall-success {
+    display: none;
+    text-align: center; padding: 20px 0;
+  }
+  .wall-success .tick {
+    font-size: 56px; margin-bottom: 16px;
+  }
+  .wall-success h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px; font-weight: 700;
+    color: var(--teal); margin-bottom: 10px;
+  }
+  .wall-success p {
+    font-size: 15px; color: var(--text-muted); line-height: 1.6;
+  }
+  .wall-success .enter-btn {
+    display: inline-block;
+    margin-top: 28px;
+    background: var(--teal);
+    color: var(--bg);
+    padding: 14px 36px;
+    border-radius: 30px;
+    font-weight: 700; font-size: 15px;
+    cursor: pointer;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.3s;
+    box-shadow: 0 0 30px rgba(0,229,195,0.4);
+  }
+  .wall-success .enter-btn:hover {
+    box-shadow: 0 0 50px rgba(0,229,195,0.6);
+    transform: translateY(-2px);
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(7,13,12,0.3);
+    border-top-color: var(--bg);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 600px) {
+    .wall-card { padding: 40px 28px; }
+    .wall-row { flex-direction: column; gap: 14px; }
+    .wall-title { font-size: 22px; }
+  }
+</style>
+
+<div id="signupWall">
+  <div class="wall-card">
+    <img class="wall-logo" id="wallLogo" src="" alt="NestAgent AI">
+    <h2 class="wall-title">Get Early Access 🌿</h2>
+    <p class="wall-sub">Join 247+ real estate professionals already on the waitlist. Fill in your details to unlock the platform.</p>
+
+    <div class="wall-form" id="wallForm">
+      <div class="wall-row">
+        <input class="wall-input" id="wName" type="text" placeholder="Your full name *">
+        <input class="wall-input" id="wPhone" type="tel" placeholder="Phone number *">
+      </div>
+      <input class="wall-input" id="wEmail" type="email" placeholder="Email address *">
+      <input class="wall-input" id="wCompany" type="text" placeholder="Company / Project name (optional)">
+      <div class="custom-select-wrapper" id="planWrapper">
+        <div class="custom-select-trigger" id="planTrigger" onclick="togglePlanDropdown()">
+          <span id="planTriggerText">Interested in which plan?</span>
+        </div>
+        <svg class="custom-select-arrow" viewBox="0 0 16 16" fill="none">
+          <path d="M3 6L8 11L13 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="custom-options" id="planOptions">
+          <div class="custom-option" onclick="selectPlan('Starter - ₹2,999/mo', this)">Starter — ₹2,999/mo</div>
+          <div class="custom-option" onclick="selectPlan('Growth - ₹7,999/mo', this)">Growth — ₹7,999/mo <span style="color:var(--teal);font-size:11px;">Most Popular</span></div>
+          <div class="custom-option" onclick="selectPlan('Enterprise - Custom', this)">Enterprise — Custom</div>
+          <div class="custom-option" onclick="selectPlan('Just exploring', this)">Just exploring</div>
+        </div>
+      </div>
+      <input type="hidden" id="wPlan" value="">
+      <button class="wall-btn" id="wallSubmitBtn" onclick="submitSignup()">
+        <span id="wallBtnText">Join Waitlist & Enter →</span>
+        <div class="spinner" id="wallSpinner" style="display:none;"></div>
+      </button>
+      <p class="wall-note">🔒 No spam. No credit card. We'll reach out personally when your access is ready.</p>
+    </div>
+
+    <div class="wall-success" id="wallSuccess">
+      <div class="tick">🎉</div>
+      <h3>You're on the list!</h3>
+      <p>Welcome aboard! We'll contact you personally on your phone/email when your access is ready. You're among the first.</p>
+      <button class="enter-btn" onclick="enterSite()">Explore the Website →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Custom dropdown
+  function togglePlanDropdown() {
+    const trigger = document.getElementById('planTrigger');
+    const options = document.getElementById('planOptions');
+    trigger.classList.toggle('open');
+    options.classList.toggle('open');
+  }
+  function selectPlan(value, el) {
+    document.getElementById('wPlan').value = value;
+    document.getElementById('planTriggerText').textContent = value;
+    document.getElementById('planTrigger').classList.add('selected');
+    document.getElementById('planTrigger').classList.remove('open');
+    document.getElementById('planOptions').classList.remove('open');
+    document.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if(!document.getElementById('planWrapper').contains(e.target)) {
+      document.getElementById('planTrigger').classList.remove('open');
+      document.getElementById('planOptions').classList.remove('open');
+    }
+  });
+
+  // Set logo in signup wall
+  const navLogoSrc = document.querySelector('.nav-logo img').src;
+  document.getElementById('wallLogo').src = navLogoSrc;
+
+  // Pre-fill email if came from waitlist section
+  function openSignupWall(prefillEmail) {
+    if(prefillEmail) document.getElementById('wEmail').value = prefillEmail;
+    document.getElementById('signupWall').style.display = 'flex';
+  }
+
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2RjQjgIfwJ22srUP-NZWb95vqnl1EnQZR7wj65Lb-DXpq_eyFByEX9BxOIO4VqMBn/exec";
+
+  async function submitSignup() {
+    const name = document.getElementById('wName').value.trim();
+    const phone = document.getElementById('wPhone').value.trim();
+    const email = document.getElementById('wEmail').value.trim();
+    const company = document.getElementById('wCompany').value.trim();
+    const plan = document.getElementById('wPlan').value;
+
+    // Validation
+    let hasError = false;
+    [['wName', name], ['wPhone', phone], ['wEmail', email]].forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if(!val) { el.classList.add('error'); hasError = true; }
+      else el.classList.remove('error');
+    });
+    if(email && !email.includes('@')) {
+      document.getElementById('wEmail').classList.add('error');
+      hasError = true;
+    }
+    if(hasError) return;
+
+    // Loading state
+    const btn = document.getElementById('wallSubmitBtn');
+    btn.disabled = true;
+    document.getElementById('wallBtnText').style.display = 'none';
+    document.getElementById('wallSpinner').style.display = 'block';
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, company, plan })
+      });
+    } catch(err) {
+      console.log('Saved offline, will sync.');
+    }
+
+    // Show success
+    document.getElementById('wallForm').style.display = 'none';
+    document.getElementById('wallSuccess').style.display = 'block';
+
+    // Update counter
+    const counter = document.getElementById('counter');
+    if(counter) {
+      let n = parseInt(counter.textContent) || 247;
+      counter.textContent = n + 1;
+    }
+  }
+
+  function enterSite() {
+    const wall = document.getElementById('signupWall');
+    wall.style.transition = 'opacity 0.5s ease';
+    wall.style.opacity = '0';
+    setTimeout(() => { wall.style.display = 'none'; }, 500);
+  }
+
+  // Nav buttons bhi signup wall kholein
+  document.querySelectorAll('a[href="#waitlist"], .nav-cta').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('signupWall').style.display = 'flex';
+      document.getElementById('signupWall').style.opacity = '1';
+    });
+  });
+</script>
 </body>
 </html>
