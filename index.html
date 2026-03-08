@@ -110,6 +110,68 @@
     box-shadow: 0 0 30px rgba(0,229,195,0.5);
   }
 
+  /* ---- USER AVATAR ---- */
+  #userAvatarBtn {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,229,195,0.08);
+    border: 1px solid rgba(0,229,195,0.25);
+    border-radius: 30px;
+    padding: 7px 16px 7px 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+  }
+  #userAvatarBtn:hover {
+    background: rgba(0,229,195,0.15);
+    border-color: var(--teal);
+  }
+  .avatar-circle {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal), #00b890);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    color: #070d0c;
+    flex-shrink: 0;
+  }
+  .avatar-email {
+    font-size: 12px;
+    color: var(--text-muted);
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #userDropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    background: #0d1a18;
+    border: 1px solid rgba(0,229,195,0.2);
+    border-radius: 16px;
+    padding: 8px;
+    min-width: 200px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    z-index: 9999;
+  }
+  #userDropdown.open { display: block; }
+  .dropdown-item {
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .dropdown-item:hover { background: rgba(0,229,195,0.08); color: var(--text); }
+  .dropdown-divider { height: 1px; background: rgba(0,229,195,0.1); margin: 6px 0; }
+  .dropdown-logout { color: rgba(255,100,100,0.8) !important; }
+  .dropdown-logout:hover { background: rgba(255,100,100,0.08) !important; color: rgba(255,100,100,1) !important; }
+
   /* ---- HERO ---- */
   #hero {
     min-height: 100vh;
@@ -805,6 +867,14 @@
     .hero-stats { gap: 32px; }
   }
 </style>
+
+<!-- ===== SUPABASE AUTH ===== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://atqwrsadttsyuhjuicsz.supabase.co';       // 👈 APNI URL YAHAN DALO
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXdyc2FkdHRzeXVoanVpY3N6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4ODM0NjgsImV4cCI6MjA4ODQ1OTQ2OH0.XYyNAO2rVgQNVh7nR6bWlSNzFb-QGwgCgaghU2xEbWw';                  // 👈 APNI KEY YAHAN DALO
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
 </head>
 <body>
 
@@ -821,7 +891,19 @@
     <li><a href="#agents">Agents</a></li>
     <li><a href="#pricing">Pricing</a></li>
   </ul>
-  <a href="#waitlist" class="nav-cta">Join Waitlist</a>
+  <a href="#waitlist" class="nav-cta" id="navJoinBtn">Join Waitlist</a>
+  <div id="userAvatarBtn" onclick="toggleUserDropdown()">
+    <div class="avatar-circle" id="avatarInitial">?</div>
+    <span class="avatar-email" id="avatarEmail">loading...</span>
+    <div id="userDropdown">
+      <div class="dropdown-item">👤 <span id="dropdownEmail" style="font-size:12px;"></span></div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item">🤖 My Agents <span style="font-size:11px;color:var(--teal);margin-left:auto;">Coming Soon</span></div>
+      <div class="dropdown-item">⚙️ Account Settings <span style="font-size:11px;color:var(--teal);margin-left:auto;">Coming Soon</span></div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item dropdown-logout" onclick="logoutUser()">🚪 Logout</div>
+    </div>
+  </div>
 </nav>
 
 <!-- HERO -->
@@ -1365,6 +1447,23 @@
 
 <!-- ===== SIGNUP WALL OVERLAY ===== -->
 <style>
+  .auth-tab {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .auth-tab.active {
+    background: rgba(0,229,195,0.15);
+    color: var(--teal);
+  }
   #signupWall {
     position: fixed; inset: 0;
     background: rgba(7,13,12,0.97);
@@ -1583,49 +1682,248 @@
 <div id="signupWall">
   <div class="wall-card">
     <img class="wall-logo" id="wallLogo" src="" alt="NestAgent AI">
-    <h2 class="wall-title">Get Early Access 🌿</h2>
-    <p class="wall-sub">Join 247+ real estate professionals already on the waitlist. Fill in your details to unlock the platform.</p>
+    <h2 class="wall-title" id="wallTitle">Welcome to NestAgent AI 🌿</h2>
+    <p class="wall-sub" id="wallSub">Create your free account to access the platform</p>
+
+    <!-- Auth Tabs -->
+    <div style="display:flex;gap:0;background:rgba(0,229,195,0.05);border:1px solid rgba(0,229,195,0.15);border-radius:12px;padding:4px;margin-bottom:28px;">
+      <button class="auth-tab active" id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+      <button class="auth-tab" id="tabLogin" onclick="switchTab('login')">Login</button>
+    </div>
 
     <div class="wall-form" id="wallForm">
-      <div class="wall-row">
-        <input class="wall-input" id="wName" type="text" placeholder="Your full name *">
-        <input class="wall-input" id="wPhone" type="tel" placeholder="Phone number *">
-      </div>
-      <input class="wall-input" id="wEmail" type="email" placeholder="Email address *">
-      <input class="wall-input" id="wCompany" type="text" placeholder="Company / Project name (optional)">
-      <div class="custom-select-wrapper" id="planWrapper">
-        <div class="custom-select-trigger" id="planTrigger" onclick="togglePlanDropdown()">
-          <span id="planTriggerText">Interested in which plan?</span>
-        </div>
-        <svg class="custom-select-arrow" viewBox="0 0 16 16" fill="none">
-          <path d="M3 6L8 11L13 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <div class="custom-options" id="planOptions">
-          <div class="custom-option" onclick="selectPlan('Starter - ₹2,999/mo', this)">Starter — ₹2,999/mo</div>
-          <div class="custom-option" onclick="selectPlan('Growth - ₹7,999/mo', this)">Growth — ₹7,999/mo <span style="color:var(--teal);font-size:11px;">Most Popular</span></div>
-          <div class="custom-option" onclick="selectPlan('Enterprise - Custom', this)">Enterprise — Custom</div>
-          <div class="custom-option" onclick="selectPlan('Just exploring', this)">Just exploring</div>
+      <!-- Signup fields -->
+      <div id="signupFields">
+        <div style="display:flex;gap:12px;margin-bottom:14px;">
+          <input class="wall-input" id="wName" type="text" placeholder="Your full name *">
+          <input class="wall-input" id="wPhone" type="tel" placeholder="Phone number *">
         </div>
       </div>
-      <input type="hidden" id="wPlan" value="">
-      <button class="wall-btn" id="wallSubmitBtn" onclick="submitSignup()">
-        <span id="wallBtnText">Join Waitlist & Enter →</span>
+
+      <input class="wall-input" id="wEmail" type="email" placeholder="Email address *" style="margin-bottom:14px;">
+      <input class="wall-input" id="wPassword" type="password" placeholder="Password * (min 6 characters)" style="margin-bottom:14px;">
+
+      <!-- Signup only fields -->
+      <div id="signupExtraFields">
+        <input class="wall-input" id="wCompany" type="text" placeholder="Company / Project name (optional)" style="margin-bottom:14px;">
+        <div class="custom-select-wrapper" id="planWrapper" style="margin-bottom:14px;">
+          <div class="custom-select-trigger" id="planTrigger" onclick="togglePlanDropdown()">
+            <span id="planTriggerText">Interested in which plan?</span>
+          </div>
+          <svg class="custom-select-arrow" viewBox="0 0 16 16" fill="none">
+            <path d="M3 6L8 11L13 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="custom-options" id="planOptions">
+            <div class="custom-option" onclick="selectPlan('Starter - ₹2,999/mo', this)">Starter — ₹2,999/mo</div>
+            <div class="custom-option" onclick="selectPlan('Growth - ₹7,999/mo', this)">Growth — ₹7,999/mo <span style="color:var(--teal);font-size:11px;">Most Popular</span></div>
+            <div class="custom-option" onclick="selectPlan('Enterprise - Custom', this)">Enterprise — Custom</div>
+            <div class="custom-option" onclick="selectPlan('Just exploring', this)">Just exploring</div>
+          </div>
+        </div>
+        <input type="hidden" id="wPlan" value="">
+      </div>
+
+      <!-- Error message -->
+      <div id="authError" style="display:none;background:rgba(255,100,100,0.08);border:1px solid rgba(255,100,100,0.3);border-radius:10px;padding:12px 16px;font-size:13px;color:rgba(255,120,120,1);margin-bottom:14px;text-align:left;"></div>
+
+      <button class="wall-btn" id="wallSubmitBtn" onclick="submitAuth()">
+        <span id="wallBtnText">Create Account & Enter →</span>
         <div class="spinner" id="wallSpinner" style="display:none;"></div>
       </button>
-      <p class="wall-note">🔒 No spam. No credit card. We'll reach out personally when your access is ready.</p>
+      <p class="wall-note">🔒 No spam. No credit card. Your data is safe.</p>
     </div>
 
     <div class="wall-success" id="wallSuccess">
       <div class="tick">🎉</div>
-      <h3>You're on the list!</h3>
-      <p>Welcome aboard! We'll contact you personally on your phone/email when your access is ready. You're among the first.</p>
-      <button class="enter-btn" onclick="enterSite()">Explore the Website →</button>
+      <h3>You're in!</h3>
+      <p id="successMsg">Account created! Welcome to NestAgent AI. We'll be in touch personally.</p>
+      <button class="enter-btn" onclick="enterSite()">Explore the Platform →</button>
     </div>
   </div>
 </div>
 
 <script>
-  // Custom dropdown
+  // ===== SUPABASE AUTH SYSTEM =====
+  let currentTab = 'signup';
+
+  // Set logo in signup wall
+  window.addEventListener('DOMContentLoaded', () => {
+    const navLogoSrc = document.querySelector('.nav-logo img')?.src;
+    if(navLogoSrc) document.getElementById('wallLogo').src = navLogoSrc;
+    checkSession();
+  });
+
+  // Check if user already logged in
+  async function checkSession() {
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if(session && session.user) {
+        onUserLoggedIn(session.user);
+      } else {
+        showWall();
+      }
+    } catch(e) {
+      console.log('Supabase not configured yet:', e.message);
+      // Supabase keys nahi daali toh wall bypass karo (dev mode)
+    }
+  }
+
+  // Listen for auth state changes
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if(event === 'SIGNED_IN' && session) {
+      onUserLoggedIn(session.user);
+    } else if(event === 'SIGNED_OUT') {
+      showWall();
+    }
+  });
+
+  function showWall() {
+    document.getElementById('signupWall').style.display = 'flex';
+    document.getElementById('signupWall').style.opacity = '1';
+    document.getElementById('navJoinBtn').style.display = 'flex';
+    document.getElementById('userAvatarBtn').style.display = 'none';
+  }
+
+  function onUserLoggedIn(user) {
+    // Hide wall
+    const wall = document.getElementById('signupWall');
+    wall.style.transition = 'opacity 0.5s ease';
+    wall.style.opacity = '0';
+    setTimeout(() => { wall.style.display = 'none'; }, 500);
+
+    // Show avatar, hide Join Waitlist
+    document.getElementById('navJoinBtn').style.display = 'none';
+    const avatarBtn = document.getElementById('userAvatarBtn');
+    avatarBtn.style.display = 'flex';
+
+    // Set avatar initial and email
+    const email = user.email || '';
+    const initial = email.charAt(0).toUpperCase();
+    document.getElementById('avatarInitial').textContent = initial;
+    document.getElementById('avatarEmail').textContent = email;
+    document.getElementById('dropdownEmail').textContent = email;
+  }
+
+  function toggleUserDropdown() {
+    document.getElementById('userDropdown').classList.toggle('open');
+  }
+  // Close dropdown outside click
+  document.addEventListener('click', function(e) {
+    if(!document.getElementById('userAvatarBtn').contains(e.target)) {
+      document.getElementById('userDropdown').classList.remove('open');
+    }
+  });
+
+  async function logoutUser() {
+    await supabaseClient.auth.signOut();
+    document.getElementById('userDropdown').classList.remove('open');
+  }
+
+  // ===== TAB SWITCHING =====
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
+    document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+
+    if(tab === 'login') {
+      document.getElementById('signupFields').style.display = 'none';
+      document.getElementById('signupExtraFields').style.display = 'none';
+      document.getElementById('wallTitle').textContent = 'Welcome back 👋';
+      document.getElementById('wallSub').textContent = 'Login to your NestAgent AI account';
+      document.getElementById('wallBtnText').textContent = 'Login →';
+    } else {
+      document.getElementById('signupFields').style.display = 'block';
+      document.getElementById('signupExtraFields').style.display = 'block';
+      document.getElementById('wallTitle').textContent = 'Welcome to NestAgent AI 🌿';
+      document.getElementById('wallSub').textContent = 'Create your free account to access the platform';
+      document.getElementById('wallBtnText').textContent = 'Create Account & Enter →';
+    }
+    document.getElementById('authError').style.display = 'none';
+  }
+
+  // ===== SUBMIT AUTH =====
+  async function submitAuth() {
+    const email = document.getElementById('wEmail').value.trim();
+    const password = document.getElementById('wPassword').value.trim();
+    const name = document.getElementById('wName')?.value?.trim() || '';
+    const phone = document.getElementById('wPhone')?.value?.trim() || '';
+    const company = document.getElementById('wCompany')?.value?.trim() || '';
+    const plan = document.getElementById('wPlan')?.value || '';
+
+    // Validation
+    if(!email || !email.includes('@')) { showAuthError('Please enter a valid email address.'); return; }
+    if(!password || password.length < 6) { showAuthError('Password must be at least 6 characters.'); return; }
+    if(currentTab === 'signup' && !name) { showAuthError('Please enter your full name.'); return; }
+    if(currentTab === 'signup' && !phone) { showAuthError('Please enter your phone number.'); return; }
+
+    // Loading
+    const btn = document.getElementById('wallSubmitBtn');
+    btn.disabled = true;
+    document.getElementById('wallBtnText').style.display = 'none';
+    document.getElementById('wallSpinner').style.display = 'block';
+    document.getElementById('authError').style.display = 'none';
+
+    try {
+      if(currentTab === 'signup') {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email, password,
+          options: { data: { full_name: name, phone, company, plan } }
+        });
+        if(error) throw error;
+
+        // Also save to Google Sheets
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2RjQjgIfwJ22srUP-NZWb95vqnl1EnQZR7wj65Lb-DXpq_eyFByEX9BxOIO4VqMBn/exec";
+        try {
+          await fetch(SCRIPT_URL, {
+            method: 'POST', mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, phone, company, plan })
+          });
+        } catch(e) {}
+
+        // Show success
+        document.getElementById('wallForm').style.display = 'none';
+        document.getElementById('wallSuccess').style.display = 'block';
+        document.getElementById('successMsg').textContent = `Account created! Check ${email} to confirm (if required). Welcome to NestAgent AI 🎉`;
+
+        // Update counter
+        const counter = document.getElementById('counter');
+        if(counter) { let n = parseInt(counter.textContent) || 247; counter.textContent = n + 1; }
+
+      } else {
+        // Login
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if(error) throw error;
+        document.getElementById('successMsg').textContent = `Logged in as ${email}. Welcome back!`;
+        document.getElementById('wallForm').style.display = 'none';
+        document.getElementById('wallSuccess').style.display = 'block';
+      }
+    } catch(err) {
+      let msg = err.message || 'Something went wrong. Please try again.';
+      if(msg.includes('Invalid login')) msg = 'Incorrect email or password. Please try again.';
+      if(msg.includes('already registered')) msg = 'This email is already registered. Please login instead.';
+      if(msg.includes('Email not confirmed')) msg = 'Please confirm your email first, then login.';
+      showAuthError(msg);
+      btn.disabled = false;
+      document.getElementById('wallBtnText').style.display = 'inline';
+      document.getElementById('wallSpinner').style.display = 'none';
+    }
+  }
+
+  function showAuthError(msg) {
+    const el = document.getElementById('authError');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+  }
+
+  function enterSite() {
+    const wall = document.getElementById('signupWall');
+    wall.style.transition = 'opacity 0.5s ease';
+    wall.style.opacity = '0';
+    setTimeout(() => { wall.style.display = 'none'; }, 500);
+  }
+
+  // ===== CUSTOM DROPDOWN =====
   function togglePlanDropdown() {
     const trigger = document.getElementById('planTrigger');
     const options = document.getElementById('planOptions');
@@ -1641,90 +1939,28 @@
     document.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
     el.classList.add('selected');
   }
-  // Close dropdown when clicking outside
   document.addEventListener('click', function(e) {
-    if(!document.getElementById('planWrapper').contains(e.target)) {
-      document.getElementById('planTrigger').classList.remove('open');
-      document.getElementById('planOptions').classList.remove('open');
+    const wrapper = document.getElementById('planWrapper');
+    if(wrapper && !wrapper.contains(e.target)) {
+      document.getElementById('planTrigger')?.classList.remove('open');
+      document.getElementById('planOptions')?.classList.remove('open');
     }
   });
 
-  // Set logo in signup wall
-  const navLogoSrc = document.querySelector('.nav-logo img').src;
-  document.getElementById('wallLogo').src = navLogoSrc;
-
-  // Pre-fill email if came from waitlist section
-  function openSignupWall(prefillEmail) {
-    if(prefillEmail) document.getElementById('wEmail').value = prefillEmail;
-    document.getElementById('signupWall').style.display = 'flex';
-  }
-
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2RjQjgIfwJ22srUP-NZWb95vqnl1EnQZR7wj65Lb-DXpq_eyFByEX9BxOIO4VqMBn/exec";
-
-  async function submitSignup() {
-    const name = document.getElementById('wName').value.trim();
-    const phone = document.getElementById('wPhone').value.trim();
-    const email = document.getElementById('wEmail').value.trim();
-    const company = document.getElementById('wCompany').value.trim();
-    const plan = document.getElementById('wPlan').value;
-
-    // Validation
-    let hasError = false;
-    [['wName', name], ['wPhone', phone], ['wEmail', email]].forEach(([id, val]) => {
-      const el = document.getElementById(id);
-      if(!val) { el.classList.add('error'); hasError = true; }
-      else el.classList.remove('error');
-    });
-    if(email && !email.includes('@')) {
-      document.getElementById('wEmail').classList.add('error');
-      hasError = true;
-    }
-    if(hasError) return;
-
-    // Loading state
-    const btn = document.getElementById('wallSubmitBtn');
-    btn.disabled = true;
-    document.getElementById('wallBtnText').style.display = 'none';
-    document.getElementById('wallSpinner').style.display = 'block';
-
-    try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, company, plan })
-      });
-    } catch(err) {
-      console.log('Saved offline, will sync.');
-    }
-
-    // Show success
-    document.getElementById('wallForm').style.display = 'none';
-    document.getElementById('wallSuccess').style.display = 'block';
-
-    // Update counter
-    const counter = document.getElementById('counter');
-    if(counter) {
-      let n = parseInt(counter.textContent) || 247;
-      counter.textContent = n + 1;
-    }
-  }
-
-  function enterSite() {
-    const wall = document.getElementById('signupWall');
-    wall.style.transition = 'opacity 0.5s ease';
-    wall.style.opacity = '0';
-    setTimeout(() => { wall.style.display = 'none'; }, 500);
-  }
-
-  // Nav buttons bhi signup wall kholein
-  document.querySelectorAll('a[href="#waitlist"], .nav-cta').forEach(btn => {
+  // Nav buttons — open auth wall
+  document.querySelectorAll('#navJoinBtn').forEach(btn => {
     btn.addEventListener('click', function(e) {
       e.preventDefault();
       document.getElementById('signupWall').style.display = 'flex';
       document.getElementById('signupWall').style.opacity = '1';
     });
   });
+
+  // Pre-fill email if came from waitlist section
+  function openSignupWall(prefillEmail) {
+    if(prefillEmail) document.getElementById('wEmail').value = prefillEmail;
+    document.getElementById('signupWall').style.display = 'flex';
+  }
 </script>
 </body>
 </html>
